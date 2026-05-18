@@ -19,7 +19,7 @@
 --  [핵심 설계 원칙]
 --  - @latest_ym 자동 기준 → 새 파일 적재 시 자동 반영
 --  - 카테고리 IN 필터 없음 → 데이터 변동 시 순위 자동 변경
---  - 최근3개월 vs 이전3개월 트렌드 방향 자동 감지 (UP/DOWN/FLAT)
+--  - 최근6개월 vs 이전6개월 트렌드 방향 자동 감지 (UP/DOWN/FLAT)
 --  - M- (월별 시각화용) / Y- (연도별 장기 분석용)
 -- ============================================================
 
@@ -71,7 +71,7 @@ SELECT
 -- ============================================================
 -- [연료별 트렌드]
 --   M-1: 월별 시계열 (시각화용 롱 포맷)
---   M-2: 단기 트렌드 방향 (최근3개월 vs 이전3개월)
+--   M-2: 단기 트렌드 방향 (최근6개월 vs 이전6개월)
 --   Y-1: 연간 스냅샷 (연도별 YoY)
 --   Y-2: 장기 성장 순위 (최근12개월 vs 이전12개월)
 -- ============================================================
@@ -98,7 +98,7 @@ WHERE year_months BETWEEN @period_start_ym AND @latest_ym
 ORDER BY fuel_type, year_months;
 
 
--- M-2. 연료별 단기 트렌드 방향 자동 감지 (최근3개월 vs 이전3개월)
+-- M-2. 연료별 단기 트렌드 방향 자동 감지 (최근6개월 vs 이전6개월)
 WITH fuel_ranked AS (
     SELECT year_months, fuel_type, registered_count,
         ROW_NUMBER() OVER (PARTITION BY fuel_type ORDER BY year_months DESC) AS rn
@@ -107,11 +107,11 @@ WITH fuel_ranked AS (
 ),
 recent3 AS (
     SELECT fuel_type, AVG(registered_count) AS avg_r
-    FROM fuel_ranked WHERE rn <= 3 GROUP BY fuel_type
+    FROM fuel_ranked WHERE rn <= 6 GROUP BY fuel_type
 ),
 prev3 AS (
     SELECT fuel_type, AVG(registered_count) AS avg_p
-    FROM fuel_ranked WHERE rn BETWEEN 4 AND 6 GROUP BY fuel_type
+    FROM fuel_ranked WHERE rn BETWEEN 7 AND 12 GROUP BY fuel_type
 )
 SELECT
     r.fuel_type,
@@ -335,23 +335,23 @@ SELECT
     END                                                              AS segment,
     gender,
     age_group,
-    ROUND(AVG(CASE WHEN rn <= 3            THEN registered_count END)) AS recent_3m_avg,
-    ROUND(AVG(CASE WHEN rn BETWEEN 4 AND 6 THEN registered_count END)) AS prev_3m_avg,
-    ROUND(AVG(CASE WHEN rn <= 3            THEN registered_count END))
-        - ROUND(AVG(CASE WHEN rn BETWEEN 4 AND 6
+    ROUND(AVG(CASE WHEN rn <= 6            THEN registered_count END)) AS recent_3m_avg,
+    ROUND(AVG(CASE WHEN rn BETWEEN 7 AND 12 THEN registered_count END)) AS prev_3m_avg,
+    ROUND(AVG(CASE WHEN rn <= 6            THEN registered_count END))
+        - ROUND(AVG(CASE WHEN rn BETWEEN 7 AND 12
                          THEN registered_count END))                   AS abs_diff,
     ROUND(
-        (AVG(CASE WHEN rn <= 3 THEN registered_count END)
-         - AVG(CASE WHEN rn BETWEEN 4 AND 6 THEN registered_count END))
-        / NULLIF(AVG(CASE WHEN rn BETWEEN 4 AND 6
+        (AVG(CASE WHEN rn <= 6 THEN registered_count END)
+         - AVG(CASE WHEN rn BETWEEN 7 AND 12 THEN registered_count END))
+        / NULLIF(AVG(CASE WHEN rn BETWEEN 7 AND 12
                           THEN registered_count END), 0) * 100
     , 2)                                                               AS change_pct,
     CASE
-        WHEN AVG(CASE WHEN rn <= 3 THEN registered_count END)
-           > AVG(CASE WHEN rn BETWEEN 4 AND 6 THEN registered_count END) * 1.005
+        WHEN AVG(CASE WHEN rn <= 6 THEN registered_count END)
+           > AVG(CASE WHEN rn BETWEEN 7 AND 12 THEN registered_count END) * 1.005
         THEN 'UP'
-        WHEN AVG(CASE WHEN rn <= 3 THEN registered_count END)
-           < AVG(CASE WHEN rn BETWEEN 4 AND 6 THEN registered_count END) * 0.995
+        WHEN AVG(CASE WHEN rn <= 6 THEN registered_count END)
+           < AVG(CASE WHEN rn BETWEEN 7 AND 12 THEN registered_count END) * 0.995
         THEN 'DOWN'
         ELSE 'FLAT'
     END                                                                AS trend_direction

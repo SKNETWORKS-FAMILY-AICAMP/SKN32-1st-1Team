@@ -1,6 +1,6 @@
 """
-전국 자동차 등록 현황 트렌드 대시보드
-소나기 팀 | 2026
+전국 자동차 등록 현황 트렌드 대시보드 — 모듈 버전
+원본: app.py  /  show() 로 래핑하여 Appmain.py 에서 호출
 """
 
 import os
@@ -12,15 +12,6 @@ import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# ============================================================
-# 설정
-# ============================================================
-st.set_page_config(
-    page_title="자동차 트렌드 대시보드",
-    page_icon="🚗",
-    layout="wide",
-)
 
 DB_CONFIG = {
     "host":     os.getenv("DB_HOST", "localhost"),
@@ -96,7 +87,6 @@ def get_summary() -> dict:
 # SQL 정의
 # ============================================================
 SQL = {
-    # 연료별
     "M1": """
         SELECT year_months, fuel_type, registered_count,
             registered_count - LAG(registered_count)
@@ -107,7 +97,7 @@ SQL = {
                   / NULLIF(LAG(registered_count)
                      OVER (PARTITION BY fuel_type ORDER BY year_months),0)*100,2) AS mom_rate
         FROM car_fuel_stats
-        WHERE year_months BETWEEN @period_start_ym AND @latest_ym
+        WHERE year_months BETWEEN @start_ym AND @latest_ym
           AND car_type='소계' AND usage_type='계' AND region='합계'
         ORDER BY fuel_type, year_months
     """,
@@ -164,7 +154,6 @@ SQL = {
                  WHEN recent_12m<prev_12m*0.95 THEN 'DOWN' ELSE 'FLAT' END trend_direction
         FROM p WHERE prev_12m>0 ORDER BY yoy_rate DESC
     """,
-    # 차종·배기량
     "M3": """
         WITH r AS (
             SELECT year_months, car_subtype, registered_count,
@@ -224,13 +213,12 @@ SQL = {
           AND stat_year >= YEAR(CURDATE()) - 10
         ORDER BY stat_year
     """,
-    # 구매층
     "M5": """
         SELECT year_months, gender, age_group, registered_count,
             registered_count - LAG(registered_count)
                 OVER (PARTITION BY gender, age_group ORDER BY year_months) mom_diff
         FROM car_gender_age_stats
-        WHERE year_months BETWEEN @period_start_ym AND @latest_ym
+        WHERE year_months BETWEEN @start_ym AND @latest_ym
           AND region='합계' AND gender IN ('남성','여성')
           AND age_group IN ('20대','30대','40대','50대','60대','70대','80대','90대이상')
         ORDER BY year_months, gender, age_group
@@ -259,7 +247,6 @@ SQL = {
         FROM r GROUP BY gender, age_group
         ORDER BY FIELD(age_group,'20대','30대','40대','50대','60대','70대','80대','90대이상'), gender
     """,
-    # 지역
     "M7": """
         WITH l AS (SELECT region, cnt_total FROM car_region_stats WHERE year_months=@latest_ym AND car_type='합계'),
              b AS (SELECT region, cnt_total FROM car_region_stats WHERE year_months=@start_ym  AND car_type='합계')
@@ -272,7 +259,6 @@ SQL = {
         FROM l JOIN b ON l.region=b.region WHERE l.region!='합계'
         ORDER BY growth_pct DESC
     """,
-    # 수입
     "Y5": """
         SELECT year_months,
             SUM(CASE WHEN reg_type='신조차' THEN registered_count END) sinjo,
@@ -311,14 +297,12 @@ def fmt_num(n) -> str:
 
 
 def fmt_ym(df: pd.DataFrame, col: str = "year_months") -> pd.DataFrame:
-    """202401 → '2024.01' 문자열로 변환해 x축 숫자 깨짐 방지"""
     df = df.copy()
     df[col] = df[col].astype(str).str[:4] + "." + df[col].astype(str).str[4:]
     return df
 
 
 def fmt_trend(val, threshold: float = 0.5) -> str:
-    """숫자형 yoy_rate를 ▲UP/▼DOWN/━FLAT 텍스트로 변환"""
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return "-"
     try:
@@ -335,7 +319,6 @@ def fmt_trend(val, threshold: float = 0.5) -> str:
 
 
 def color_trend_str(val) -> str:
-    """fmt_trend 결과 문자열에 CSS 색상 적용 (Styler.map용)"""
     if isinstance(val, str):
         if val.startswith("▲"):
             return "color: #2ecc71; font-weight: 600"
@@ -347,7 +330,6 @@ def color_trend_str(val) -> str:
 
 
 def _ym_sub(ym_str: str, months: int) -> str:
-    """'202412'에서 months개월 전 → '2024.07' 형식 반환"""
     y, m = int(ym_str[:4]), int(ym_str[4:])
     m -= months
     while m <= 0:
@@ -362,280 +344,268 @@ def _ym_fmt(ym_str: str) -> str:
 
 
 # ============================================================
-# 레이아웃
+# 렌더링
 # ============================================================
-st.title("🚗 전국 자동차 등록 현황 트렌드 대시보드")
-st.caption("데이터: 국토교통부 자동차 등록 현황")
+def show():
+    st.title("🚗 전국 자동차 등록 현황 트렌드 대시보드")
+    st.caption("데이터: 국토교통부 자동차 등록 현황")
 
-# ── 요약 카드 ──────────────────────────────────────────────
-summary = get_summary()
-df_m2_card = run_query(SQL["M2"])
+    summary = get_summary()
+    df_m2_card = run_query(SQL["M2"])
 
-# ── 기간 레이블 (캡션용) ──────────────────────────────────
-_lym = str(summary.get("latest_ym", ""))
-_sym = str(summary.get("start_ym", ""))
-if len(_lym) == 6:
-    _recent_end   = _ym_fmt(_lym)
-    _recent_start = _ym_sub(_lym, 5)
-    _prev_end     = _ym_sub(_lym, 6)
-    _prev_start   = _ym_sub(_lym, 11)
-    _cap_6m = (f"최근 6개월: {_recent_start} ~ {_recent_end}  "
-               f"|  이전 6개월: {_prev_start} ~ {_prev_end}")
-else:
-    _cap_6m = "기간 정보 없음"
-_s_label = _ym_fmt(_sym)
-_l_label = _ym_fmt(_lym)
+    # ── FAQ 트렌드 키워드 자동 전달 (change_pct 상위 3개 연료) ──
+    # 체크 상태 초기화는 faq_search.py의 _faq_last_keywords 추적이 담당
+    if not df_m2_card.empty:
+        df_sig_top3 = df_m2_card[df_m2_card["recent_6m_avg"] >= 100]
+        if df_sig_top3.empty:
+            df_sig_top3 = df_m2_card
+        top3_fuels = df_sig_top3.head(3)["fuel_type"].tolist()  # SQL이 change_pct DESC 정렬
+        st.session_state.trend_keywords = top3_fuels
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("기준 월 (누적 기준)", summary["latest_ym"] or "-")
-c2.metric("전체 누적 등록 대수", fmt_num(summary["total_registered"]))
+    _lym = str(summary.get("latest_ym", ""))
+    _sym = str(summary.get("start_ym", ""))
+    if len(_lym) == 6:
+        _recent_end   = _ym_fmt(_lym)
+        _recent_start = _ym_sub(_lym, 5)
+        _prev_end     = _ym_sub(_lym, 6)
+        _prev_start   = _ym_sub(_lym, 11)
+        _cap_6m = (f"최근 6개월: {_recent_start} ~ {_recent_end}  "
+                   f"|  이전 6개월: {_prev_start} ~ {_prev_end}")
+    else:
+        _cap_6m = "기간 정보 없음"
+    _s_label = _ym_fmt(_sym)
+    _l_label = _ym_fmt(_lym)
 
-# 가장 상승/급감 중인 연료 동적 표시 (등록수 100 미만 소량 연료 제외)
-if not df_m2_card.empty:
-    df_m2_sig = df_m2_card[df_m2_card["recent_6m_avg"] >= 100]
-    if df_m2_sig.empty:
-        df_m2_sig = df_m2_card
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("기준 월 (누적 기준)", summary["latest_ym"] or "-")
+    c2.metric("전체 누적 등록 대수", fmt_num(summary["total_registered"]))
 
-    up_rows = df_m2_sig[df_m2_sig["trend_direction"] == "UP"]
-    top_up = up_rows.iloc[0] if not up_rows.empty else df_m2_sig.iloc[0]
-    c3.metric(
-        f"▲ 급증 연료 — {top_up['fuel_type']} (누적 등록)",
-        fmt_num(top_up["recent_6m_avg"]),
-        delta=f"{top_up['change_pct']:+.1f}% (6개월 평균 변화율)",
-    )
+    if not df_m2_card.empty:
+        df_m2_sig = df_m2_card[df_m2_card["recent_6m_avg"] >= 100]
+        if df_m2_sig.empty:
+            df_m2_sig = df_m2_card
 
-    down_rows = df_m2_sig[df_m2_sig["trend_direction"] == "DOWN"]
-    top_down = down_rows.iloc[-1] if not down_rows.empty else df_m2_sig.iloc[-1]
-    c4.metric(
-        f"▼ 급감 연료 — {top_down['fuel_type']} (누적 등록)",
-        fmt_num(top_down["recent_6m_avg"]),
-        delta=f"{top_down['change_pct']:+.1f}% (6개월 평균 변화율)",
-    )
-else:
-    c3.metric("급증 연료", "-")
-    c4.metric("급감 연료", "-")
-st.divider()
+        up_rows = df_m2_sig[df_m2_sig["trend_direction"] == "UP"]
+        top_up = up_rows.iloc[0] if not up_rows.empty else df_m2_sig.iloc[0]
+        c3.metric(
+            f"▲ 급증 연료 — {top_up['fuel_type']} (누적 등록)",
+            fmt_num(top_up["recent_6m_avg"]),
+            delta=f"{top_up['change_pct']:+.1f}% (6개월 평균 변화율)",
+        )
 
-# ── 탭 ────────────────────────────────────────────────────
-tab_m, tab_y = st.tabs(["📅 월별 트렌드", "📊 연도별 트렌드"])
-
-
-def show_table(df: pd.DataFrame, rename: dict = None, trend_col: str = "방향"):
-    """트렌드 방향 색상 강조 표 출력"""
-    d = df.rename(columns=rename) if rename else df.copy()
-    if trend_col in d.columns:
-        st.dataframe(
-            d.style.map(color_trend, subset=[trend_col]),
-            use_container_width=True, hide_index=True,
+        down_rows = df_m2_sig[df_m2_sig["trend_direction"] == "DOWN"]
+        top_down = down_rows.iloc[-1] if not down_rows.empty else df_m2_sig.iloc[-1]
+        c4.metric(
+            f"▼ 급감 연료 — {top_down['fuel_type']} (누적 등록)",
+            fmt_num(top_down["recent_6m_avg"]),
+            delta=f"{top_down['change_pct']:+.1f}% (6개월 평균 변화율)",
         )
     else:
-        st.dataframe(d, use_container_width=True, hide_index=True)
-
-
-# ============================================================
-# 월별 탭
-# ============================================================
-with tab_m:
-
-    # M-2 연료별 단기 트렌드
-    st.subheader("연료별 단기 트렌드")
-    st.caption(f"연료 유형별 누적 등록 대수 평균 비교  |  {_cap_6m}")
-    df_m2 = run_query(SQL["M2"])
-    if not df_m2.empty:
-        df_m2_disp = df_m2.copy()
-        df_m2_disp["트렌드"] = df_m2_disp["change_pct"].apply(fmt_trend)
-        st.dataframe(
-            df_m2_disp[["fuel_type", "recent_6m_avg", "prev_6m_avg", "abs_diff", "트렌드"]]
-            .rename(columns={"fuel_type": "연료", "recent_6m_avg": "최근6개월 평균",
-                             "prev_6m_avg": "이전6개월 평균", "abs_diff": "절대 증감"})
-            .style.map(color_trend_str, subset=["트렌드"]),
-            use_container_width=True, hide_index=True,
-        )
+        c3.metric("급증 연료", "-")
+        c4.metric("급감 연료", "-")
     st.divider()
 
-    # M-6 승용 차종별 트렌드
-    st.subheader("승용 차종별 트렌드")
-    st.caption(f"승용차 세부 차종별 월평균 등록 대수 비교  |  {_cap_6m}")
-    df_m3 = run_query(SQL["M3"])
-    if not df_m3.empty:
-        df_m3_disp = df_m3.copy()
-        df_m3_disp["트렌드"] = df_m3_disp["change_pct"].apply(fmt_trend)
-        st.dataframe(
-            df_m3_disp[["car_subtype", "recent_6m_avg", "prev_6m_avg", "abs_diff", "트렌드"]]
-            .rename(columns={"car_subtype": "차종", "recent_6m_avg": "최근6개월 평균",
-                             "prev_6m_avg": "이전6개월 평균", "abs_diff": "절대 증감"})
-            .style.map(color_trend_str, subset=["트렌드"]),
-            use_container_width=True, hide_index=True,
-        )
-    st.divider()
+    tab_m, tab_y = st.tabs(["📅 월별 트렌드", "📊 연도별 트렌드"])
 
-    # M-4 배기량별 트렌드
-    st.subheader("배기량별 트렌드")
-    st.caption(f"배기량 구간별 월평균 등록 대수 비교  |  {_cap_6m}")
-    df_m4 = run_query(SQL["M4"])
-    if not df_m4.empty:
-        df_m4_disp = df_m4.copy()
-        df_m4_disp["트렌드"] = df_m4_disp["change_pct"].apply(fmt_trend)
-        st.dataframe(
-            df_m4_disp[["displacement", "recent_6m_avg", "prev_6m_avg", "abs_diff", "트렌드"]]
-            .rename(columns={"displacement": "배기량", "recent_6m_avg": "최근6개월 평균",
-                             "prev_6m_avg": "이전6개월 평균", "abs_diff": "절대 증감"})
-            .style.map(color_trend_str, subset=["트렌드"]),
-            use_container_width=True, hide_index=True,
-        )
-    st.divider()
+    def show_table(df: pd.DataFrame, rename: dict = None, trend_col: str = "방향"):
+        d = df.rename(columns=rename) if rename else df.copy()
+        if trend_col in d.columns:
+            st.dataframe(
+                d.style.map(color_trend, subset=[trend_col]),
+                use_container_width=True, hide_index=True,
+            )
+        else:
+            st.dataframe(d, use_container_width=True, hide_index=True)
 
-    # M-5 성별·연령대 트렌드
-    st.subheader("성별·연령대 트렌드")
-    st.caption(f"성별·연령대별 신규 등록 대수 월평균 비교  |  {_cap_6m}")
-    df_m6 = run_query(SQL["M6"])
-    if not df_m6.empty:
-        col_m, col_f = st.columns(2)
-        for col, gender in zip([col_m, col_f], ["남성", "여성"]):
-            with col:
-                st.caption(f"**{gender}**")
-                df_g = df_m6[df_m6["gender"] == gender].copy()
-                df_g["트렌드"] = df_g["change_pct"].apply(fmt_trend)
-                df_g = df_g[["age_group", "recent_6m_avg", "prev_6m_avg",
-                              "abs_diff", "트렌드"]].copy()
-                df_g.columns = ["연령대", "최근6개월", "이전6개월", "절대증감", "트렌드"]
-                st.dataframe(
-                    df_g.style.map(color_trend_str, subset=["트렌드"]),
-                    use_container_width=True, hide_index=True,
-                )
-    st.divider()
+    # ── 월별 탭 ────────────────────────────────────────────
+    with tab_m:
+        st.subheader("연료별 단기 트렌드")
+        st.caption(f"연료 유형별 누적 등록 대수 평균 비교  |  {_cap_6m}")
+        df_m2 = run_query(SQL["M2"])
+        if not df_m2.empty:
+            df_m2_disp = df_m2.copy()
+            df_m2_disp["트렌드"] = df_m2_disp["change_pct"].apply(fmt_trend)
+            st.dataframe(
+                df_m2_disp[["fuel_type", "recent_6m_avg", "prev_6m_avg", "abs_diff", "트렌드"]]
+                .rename(columns={"fuel_type": "연료", "recent_6m_avg": "최근6개월 평균",
+                                 "prev_6m_avg": "이전6개월 평균", "abs_diff": "절대 증감"})
+                .style.map(color_trend_str, subset=["트렌드"]),
+                use_container_width=True, hide_index=True,
+            )
+            top3_kws = st.session_state.get("trend_keywords", [])
+            if top3_kws:
+                kw_tags = "  |  ".join(f"**{k}**" for k in top3_kws)
+                st.caption(f"📌 FAQ 트렌드 키워드 자동 전달 중 → {kw_tags}  (첫 번째 키워드 기본 선택)")
+        st.divider()
 
-    # Y-5 수입차 비중 월별 추이
-    st.subheader("수입차 비중 월별 추이")
-    st.caption(f"월별 신규 등록 중 수입차 비중 추이  |  {_s_label} ~ {_l_label}")
-    df_y5 = run_query(SQL["Y5"])
-    if not df_y5.empty:
-        col1, col2, col3 = st.columns(3)
-        col1.metric("최신 수입차 비중", f"{df_y5['import_pct'].iloc[-1]:.1f}%")
-        col2.metric("기간 평균 비중", f"{df_y5['import_pct'].mean():.1f}%")
-        col3.metric("최고 비중",
-                    f"{df_y5['import_pct'].max():.1f}% ({fmt_ym(df_y5).loc[df_y5['import_pct'].idxmax(), 'year_months']})")
+        st.subheader("승용 차종별 트렌드")
+        st.caption(f"승용차 세부 차종별 월평균 등록 대수 비교  |  {_cap_6m}")
+        df_m3 = run_query(SQL["M3"])
+        if not df_m3.empty:
+            df_m3_disp = df_m3.copy()
+            df_m3_disp["트렌드"] = df_m3_disp["change_pct"].apply(fmt_trend)
+            st.dataframe(
+                df_m3_disp[["car_subtype", "recent_6m_avg", "prev_6m_avg", "abs_diff", "트렌드"]]
+                .rename(columns={"car_subtype": "차종", "recent_6m_avg": "최근6개월 평균",
+                                 "prev_6m_avg": "이전6개월 평균", "abs_diff": "절대 증감"})
+                .style.map(color_trend_str, subset=["트렌드"]),
+                use_container_width=True, hide_index=True,
+            )
+        st.divider()
 
-        df_y5_chart = fmt_ym(df_y5).copy()
-        fig_y5 = px.line(
-            df_y5_chart, x="year_months", y="import_pct",
-            labels={"year_months": "년월", "import_pct": "수입비중(%)"},
-            markers=True,
-        )
-        fig_y5.add_hline(
-            y=df_y5["import_pct"].mean(),
-            line_dash="dash", line_color="gray",
-            annotation_text="평균",
-            annotation_position="bottom right",
-        )
-        fig_y5.update_layout(
-            margin=dict(t=20, b=20),
-            xaxis=dict(tickangle=-45),
-        )
-        st.plotly_chart(fig_y5, use_container_width=True)
+        st.subheader("배기량별 트렌드")
+        st.caption(f"배기량 구간별 월평균 등록 대수 비교  |  {_cap_6m}")
+        df_m4 = run_query(SQL["M4"])
+        if not df_m4.empty:
+            df_m4_disp = df_m4.copy()
+            df_m4_disp["트렌드"] = df_m4_disp["change_pct"].apply(fmt_trend)
+            st.dataframe(
+                df_m4_disp[["displacement", "recent_6m_avg", "prev_6m_avg", "abs_diff", "트렌드"]]
+                .rename(columns={"displacement": "배기량", "recent_6m_avg": "최근6개월 평균",
+                                 "prev_6m_avg": "이전6개월 평균", "abs_diff": "절대 증감"})
+                .style.map(color_trend_str, subset=["트렌드"]),
+                use_container_width=True, hide_index=True,
+            )
+        st.divider()
 
-        df_y5_tbl = fmt_ym(df_y5)[["year_months", "import_cnt", "total_cnt", "import_pct"]].copy()
-        df_y5_tbl["전월대비"] = df_y5["import_pct"].diff().apply(
-            lambda x: fmt_trend(x, threshold=0.1) if pd.notna(x) else "-"
-        )
-        df_y5_tbl.columns = ["년월", "수입차", "신규등록 합계", "수입비중(%)", "전월대비"]
-        st.dataframe(
-            df_y5_tbl.style.map(color_trend_str, subset=["전월대비"]),
-            use_container_width=True, hide_index=True,
-        )
+        st.subheader("성별·연령대 트렌드")
+        st.caption(f"성별·연령대별 신규 등록 대수 월평균 비교  |  {_cap_6m}")
+        df_m6 = run_query(SQL["M6"])
+        if not df_m6.empty:
+            col_m, col_f = st.columns(2)
+            for col, gender in zip([col_m, col_f], ["남성", "여성"]):
+                with col:
+                    st.caption(f"**{gender}**")
+                    df_g = df_m6[df_m6["gender"] == gender].copy()
+                    df_g["트렌드"] = df_g["change_pct"].apply(fmt_trend)
+                    df_g = df_g[["age_group", "recent_6m_avg", "prev_6m_avg",
+                                  "abs_diff", "트렌드"]].copy()
+                    df_g.columns = ["연령대", "최근6개월", "이전6개월", "절대증감", "트렌드"]
+                    st.dataframe(
+                        df_g.style.map(color_trend_str, subset=["트렌드"]),
+                        use_container_width=True, hide_index=True,
+                    )
+        st.divider()
 
-        with st.expander("신규등록 구성 상세 (신조차·수입차·부활차)"):
-            df_y5_detail = fmt_ym(df_y5)[["year_months", "sinjo", "import_cnt",
-                                          "buhwal", "total_cnt", "import_pct"]].copy()
-            df_y5_detail.columns = ["년월", "신조차", "수입차", "부활차", "합계", "수입비중(%)"]
-            st.dataframe(df_y5_detail, use_container_width=True, hide_index=True)
+        st.subheader("수입차 비중 월별 추이")
+        st.caption(f"월별 신규 등록 중 수입차 비중 추이  |  {_s_label} ~ {_l_label}")
+        df_y5 = run_query(SQL["Y5"])
+        if not df_y5.empty:
+            col1, col2, col3 = st.columns(3)
+            col1.metric("최신 수입차 비중", f"{df_y5['import_pct'].iloc[-1]:.1f}%")
+            col2.metric("기간 평균 비중", f"{df_y5['import_pct'].mean():.1f}%")
+            col3.metric("최고 비중",
+                        f"{df_y5['import_pct'].max():.1f}% ({fmt_ym(df_y5).loc[df_y5['import_pct'].idxmax(), 'year_months']})")
 
+            df_y5_chart = fmt_ym(df_y5).copy()
+            fig_y5 = px.line(
+                df_y5_chart, x="year_months", y="import_pct",
+                labels={"year_months": "년월", "import_pct": "수입비중(%)"},
+                markers=True,
+            )
+            fig_y5.add_hline(
+                y=df_y5["import_pct"].mean(),
+                line_dash="dash", line_color="gray",
+                annotation_text="평균",
+                annotation_position="bottom right",
+            )
+            fig_y5.update_layout(margin=dict(t=20, b=20), xaxis=dict(tickangle=-45))
+            st.plotly_chart(fig_y5, use_container_width=True)
 
-# ============================================================
-# 연도별 탭
-# ============================================================
-with tab_y:
+            df_y5_tbl = fmt_ym(df_y5)[["year_months", "import_cnt", "total_cnt", "import_pct"]].copy()
+            df_y5_tbl["전월대비"] = df_y5["import_pct"].diff().apply(
+                lambda x: fmt_trend(x, threshold=0.1) if pd.notna(x) else "-"
+            )
+            df_y5_tbl.columns = ["년월", "수입차", "신규등록 합계", "수입비중(%)", "전월대비"]
+            st.dataframe(
+                df_y5_tbl.style.map(color_trend_str, subset=["전월대비"]),
+                use_container_width=True, hide_index=True,
+            )
 
-    # Y-4 전체 시장 연도별 규모 및 성장률
-    st.subheader("전체 시장 연도별 규모 및 성장률")
-    st.caption("연도별 전체 자동차 누적 등록 대수 및 전년 대비 증감률  |  최근 10개년 기준")
-    df_y4 = run_query(SQL["Y4"])
-    if not df_y4.empty:
-        df_y4_disp = df_y4.copy()
-        df_y4_disp["연도"] = df_y4_disp["stat_year"].astype(str)
-        df_y4_disp["전체 등록수"] = df_y4_disp["registered_count"].apply(
-            lambda x: f"{int(x):,}" if pd.notna(x) else "-"
-        )
-        df_y4_disp["전년 대비"] = df_y4_disp["yoy_rate"].apply(fmt_trend)
-        st.dataframe(
-            df_y4_disp[["연도", "전체 등록수", "전년 대비"]]
-            .style.map(color_trend_str, subset=["전년 대비"]),
-            use_container_width=True, hide_index=True,
-        )
-    st.divider()
+            with st.expander("신규등록 구성 상세 (신조차·수입차·부활차)"):
+                df_y5_detail = fmt_ym(df_y5)[["year_months", "sinjo", "import_cnt",
+                                              "buhwal", "total_cnt", "import_pct"]].copy()
+                df_y5_detail.columns = ["년월", "신조차", "수입차", "부활차", "합계", "수입비중(%)"]
+                st.dataframe(df_y5_detail, use_container_width=True, hide_index=True)
 
-    # Y-2 연료별 장기 성장 순위
-    _y2_recent_start = _ym_sub(_lym, 11)
-    _y2_prev_end     = _ym_sub(_lym, 12)
-    _y2_prev_start   = _ym_sub(_lym, 23)
-    st.subheader("연료별 장기 성장 순위")
-    st.caption(
-        f"연료 유형별 연간 등록 합계 비교  |  "
-        f"최근 12개월: {_y2_recent_start} ~ {_ym_fmt(_lym)}  |  "
-        f"이전 12개월: {_y2_prev_start} ~ {_y2_prev_end}"
-    )
-    df_y2 = run_query(SQL["Y2"])
-    if not df_y2.empty:
-        df_y2_disp = df_y2.copy()
-        df_y2_disp["트렌드"] = df_y2_disp["yoy_rate"].apply(fmt_trend)
-        st.dataframe(
-            df_y2_disp[["fuel_type", "recent_12m", "prev_12m", "diff", "트렌드"]]
-            .rename(columns={"fuel_type": "연료", "recent_12m": "최근12개월 합계",
-                             "prev_12m": "이전12개월 합계", "diff": "증감"})
-            .style.map(color_trend_str, subset=["트렌드"]),
-            use_container_width=True, hide_index=True,
-        )
-    st.divider()
+    # ── 연도별 탭 ──────────────────────────────────────────
+    with tab_y:
+        st.subheader("전체 시장 연도별 규모 및 성장률")
+        st.caption("연도별 전체 자동차 누적 등록 대수 및 전년 대비 증감률  |  최근 10개년 기준")
+        df_y4 = run_query(SQL["Y4"])
+        if not df_y4.empty:
+            df_y4_disp = df_y4.copy()
+            df_y4_disp["연도"] = df_y4_disp["stat_year"].astype(str)
+            df_y4_disp["전체 등록수"] = df_y4_disp["registered_count"].apply(
+                lambda x: f"{int(x):,}" if pd.notna(x) else "-"
+            )
+            df_y4_disp["전년 대비"] = df_y4_disp["yoy_rate"].apply(fmt_trend)
+            st.dataframe(
+                df_y4_disp[["연도", "전체 등록수", "전년 대비"]]
+                .style.map(color_trend_str, subset=["전년 대비"]),
+                use_container_width=True, hide_index=True,
+            )
+        st.divider()
 
-    # Y-6 차종별 연도별 등록 현황
-    st.subheader("차종별 연도별 등록 현황")
-    st.caption("차종(승용·승합·화물·특수)별 연도말 기준 누적 등록 대수 및 전년 대비 증감률  |  최근 10개년 기준")
-    df_y3 = run_query(SQL["Y3"])
-    if not df_y3.empty:
-        pivot_cnt = df_y3.pivot_table(
-            index="car_type", columns="stat_year",
-            values="registered_count", aggfunc="first",
+        _y2_recent_start = _ym_sub(_lym, 11)
+        _y2_prev_end     = _ym_sub(_lym, 12)
+        _y2_prev_start   = _ym_sub(_lym, 23)
+        st.subheader("연료별 장기 성장 순위")
+        st.caption(
+            f"연료 유형별 연간 등록 합계 비교  |  "
+            f"최근 12개월: {_y2_recent_start} ~ {_ym_fmt(_lym)}  |  "
+            f"이전 12개월: {_y2_prev_start} ~ {_y2_prev_end}"
         )
-        pivot_cnt.columns = pivot_cnt.columns.astype(str)
-        pivot_cnt.index.name = "차종"
-        st.dataframe(pivot_cnt.map(lambda x: f"{int(x):,}" if pd.notna(x) else "-"),
-                     use_container_width=True)
-        st.caption("전년 대비 증감률")
-        pivot_rate = df_y3.pivot_table(
-            index="car_type", columns="stat_year",
-            values="yoy_rate", aggfunc="first",
-        )
-        pivot_rate.columns = pivot_rate.columns.astype(str)
-        pivot_rate.index.name = "차종"
-        st.dataframe(
-            pivot_rate.map(fmt_trend).style.map(color_trend_str),
-            use_container_width=True,
-        )
-    st.divider()
+        df_y2 = run_query(SQL["Y2"])
+        if not df_y2.empty:
+            df_y2_disp = df_y2.copy()
+            df_y2_disp["트렌드"] = df_y2_disp["yoy_rate"].apply(fmt_trend)
+            st.dataframe(
+                df_y2_disp[["fuel_type", "recent_12m", "prev_12m", "diff", "트렌드"]]
+                .rename(columns={"fuel_type": "연료", "recent_12m": "최근12개월 합계",
+                                 "prev_12m": "이전12개월 합계", "diff": "증감"})
+                .style.map(color_trend_str, subset=["트렌드"]),
+                use_container_width=True, hide_index=True,
+            )
+        st.divider()
 
-    # M-7 지역별 등록 증감 순위
-    st.subheader("지역별 등록 증감 순위")
-    st.caption(f"시·도별 누적 등록 대수 전체 기간 비교  |  {_s_label} (데이터 시작월) → {_l_label} (최근월)")
-    df_m7 = run_query(SQL["M7"])
-    if not df_m7.empty:
-        df_m7_disp = df_m7.copy()
-        df_m7_disp["트렌드"] = df_m7_disp["growth_pct"].apply(fmt_trend)
-        st.dataframe(
-            df_m7_disp[["region", "base_cnt", "latest_cnt", "diff", "트렌드"]]
-            .rename(columns={"region": "지역",
-                             "base_cnt": f"등록수 ({_s_label})",
-                             "latest_cnt": f"등록수 ({_l_label})",
-                             "diff": "증감"})
-            .style.map(color_trend_str, subset=["트렌드"]),
-            use_container_width=True, hide_index=True,
-        )
+        st.subheader("차종별 연도별 등록 현황")
+        st.caption("차종(승용·승합·화물·특수)별 연도말 기준 누적 등록 대수 및 전년 대비 증감률  |  최근 10개년 기준")
+        df_y3 = run_query(SQL["Y3"])
+        if not df_y3.empty:
+            pivot_cnt = df_y3.pivot_table(
+                index="car_type", columns="stat_year",
+                values="registered_count", aggfunc="first",
+            )
+            pivot_cnt.columns = pivot_cnt.columns.astype(str)
+            pivot_cnt.index.name = "차종"
+            st.dataframe(pivot_cnt.map(lambda x: f"{int(x):,}" if pd.notna(x) else "-"),
+                         use_container_width=True)
+            st.caption("전년 대비 증감률")
+            pivot_rate = df_y3.pivot_table(
+                index="car_type", columns="stat_year",
+                values="yoy_rate", aggfunc="first",
+            )
+            pivot_rate.columns = pivot_rate.columns.astype(str)
+            pivot_rate.index.name = "차종"
+            st.dataframe(
+                pivot_rate.map(fmt_trend).style.map(color_trend_str),
+                use_container_width=True,
+            )
+        st.divider()
+
+        st.subheader("지역별 등록 증감 순위")
+        st.caption(f"시·도별 누적 등록 대수 전체 기간 비교  |  {_s_label} (데이터 시작월) → {_l_label} (최근월)")
+        df_m7 = run_query(SQL["M7"])
+        if not df_m7.empty:
+            df_m7_disp = df_m7.copy()
+            df_m7_disp["트렌드"] = df_m7_disp["growth_pct"].apply(fmt_trend)
+            st.dataframe(
+                df_m7_disp[["region", "base_cnt", "latest_cnt", "diff", "트렌드"]]
+                .rename(columns={"region": "지역",
+                                 "base_cnt": f"등록수 ({_s_label})",
+                                 "latest_cnt": f"등록수 ({_l_label})",
+                                 "diff": "증감"})
+                .style.map(color_trend_str, subset=["트렌드"]),
+                use_container_width=True, hide_index=True,
+            )
