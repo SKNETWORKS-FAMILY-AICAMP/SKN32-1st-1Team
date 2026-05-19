@@ -9,16 +9,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_NAME = "car_project_db"
 TABLE_NAME = "company_faq"
 
 
 def get_engine(with_db: bool = True):
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "3306")
-    user = os.getenv("DB_USER", "homework")
-    password = os.getenv("DB_PASSWORD", "playdatahomework80")
-    database = os.getenv("DB_NAME", DB_NAME)
+    host = os.getenv("DB_HOST")
+    port = os.getenv("DB_PORT")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASSWORD")
+    database = os.getenv("DB_NAME")
     db_part = f"/{database}" if with_db else ""
     db_url = f"mysql+pymysql://{user}:{password}@{host}:{port}{db_part}?charset=utf8mb4"
     return create_engine(db_url)
@@ -45,12 +44,15 @@ def save_faq_to_db(faq_items):
         """)
         inserted = 0
         for item in faq_items:
-            result = conn.execute(sql, {
-                "brand":    item.brand,
-                "category": item.category,
-                "question": item.question,
-                "answer":   item.answer,
-            })
+            result = conn.execute(
+                sql,
+                {
+                    "brand": item.brand,
+                    "category": item.category,
+                    "question": item.question,
+                    "answer": item.answer,
+                },
+            )
             inserted += result.rowcount
         conn.commit()
     skipped = len(faq_items) - inserted

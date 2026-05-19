@@ -15,12 +15,12 @@ load_dotenv()
 # 설정 (통합 DB 및 테이블 지정)
 # ================================
 DB_CONFIG = {
-    "host":     os.getenv("DB_HOST",     "localhost"),
-    "port":     int(os.getenv("DB_PORT", "3306")),
-    "user":     os.getenv("DB_USER",     "homework"),
-    "password": os.getenv("DB_PASSWORD", "playdatahomework80"),
-    "database": os.getenv("DB_NAME",     "car_project_db"),
-    "charset":  "utf8mb4",
+    "host": os.getenv("DB_HOST"),
+    "port": int(os.getenv("DB_PORT")),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "database": os.getenv("DB_NAME"),
+    "charset": "utf8mb4",
 }
 
 TABLE_NAME = "company_faq"  # ← 통합 테이블명으로 변경

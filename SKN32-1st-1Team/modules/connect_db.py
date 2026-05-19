@@ -14,12 +14,12 @@ load_dotenv()
 
 # ── DB 접속 정보 ───────────────────────────────────────────────
 DB_CONFIG = {
-    "host":     os.getenv("DB_HOST",     "localhost"),
-    "port":     int(os.getenv("DB_PORT", 3306)),
-    "user":     os.getenv("DB_USER",     "homework"),
-    "password": os.getenv("DB_PASSWORD", ""),
-    "db":       os.getenv("DB_DATABASE") or os.getenv("DB_NAME", "sknmainproject1_db"),
-    "charset":  "utf8mb4",
+    "host": os.getenv("DB_HOST"),
+    "port": int(os.getenv("DB_PORT")),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "db": os.getenv("DB_NAME"),
+    "charset": "utf8mb4",
 }
 
 
@@ -80,8 +80,15 @@ def get_summary() -> dict:
                        AND car_subtype='다목적' AND region='합계')         AS suv_total
             """)
             row = cur.fetchone()
-            keys = ["latest_ym", "start_ym", "total_months", "total_registered",
-                    "ev_total", "hybrid_total", "suv_total"]
+            keys = [
+                "latest_ym",
+                "start_ym",
+                "total_months",
+                "total_registered",
+                "ev_total",
+                "hybrid_total",
+                "suv_total",
+            ]
             return dict(zip(keys, row))
     finally:
         conn.close()

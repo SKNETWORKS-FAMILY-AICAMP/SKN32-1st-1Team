@@ -17,11 +17,11 @@ load_dotenv()
 
 PORSCHE_FAQ_URL = "https://www.porsche.com/korea/ko/faq/"
 
-MYSQL_HOST = os.getenv("DB_HOST",     "localhost")
-MYSQL_PORT = int(os.getenv("DB_PORT", "3306"))
-MYSQL_DB   = os.getenv("DB_NAME",     "car_project_db")
-MYSQL_USER = os.getenv("DB_USER",     "homework")
-MYSQL_PASSWORD = os.getenv("DB_PASSWORD", "playdatahomework80")
+MYSQL_HOST = os.getenv("DB_HOST")
+MYSQL_PORT = int(os.getenv("DB_PORT"))
+MYSQL_DB = os.getenv("DB_NAME")
+MYSQL_USER = os.getenv("DB_USER")
+MYSQL_PASSWORD = os.getenv("DB_PASSWORD")
 
 TABLE_NAME = "company_faq"  # ← 통합 테이블명 지정
 

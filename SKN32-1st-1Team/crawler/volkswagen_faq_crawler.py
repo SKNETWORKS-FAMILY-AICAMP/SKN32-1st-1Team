@@ -22,11 +22,11 @@ load_dotenv()
 
 
 def get_engine():
-    user = os.getenv("DB_USER", "homework")
-    password = os.getenv("DB_PASSWORD", "playdatahomework80")
-    host = os.getenv("DB_HOST", "localhost")
-    port = os.getenv("DB_PORT", "3306")
-    database = os.getenv("DB_NAME", "car_project_db")
+    user = os.getenv("DB_USER")
+    password = os.getenv("DB_PASSWORD")
+    host = os.getenv("DB_HOST")
+    port = os.getenv("DB_PORT")
+    database = os.getenv("DB_NAME")
 
     url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset=utf8mb4"
     return create_engine(url)
