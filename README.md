@@ -155,6 +155,7 @@ SKN32-1st-1Team/
 - 폭스바겐 FAQ - https://www.volkswagen.co.kr/ko/faq.html
 - 쉐보레 FAQ - https://www.chevrolet.co.kr/faq
 - 현대자동차 FAQ - https://www.hyundai.com/kr/ko/faq.html
+                -https://www.hyundai.com/kr/ko/faq.html
 - 제네시스 FAQ - https://www.genesis.com/kr/ko/support/faq.html
 - 케딜락 FAQ - https://www.cadillac.co.kr/onstar/onstar-faq
 ---
