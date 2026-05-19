@@ -17,12 +17,14 @@ DB_CONFIG = {
     "host":     os.getenv("DB_HOST", "localhost"),
     "port":     int(os.getenv("DB_PORT", 3306)),
     "user":     os.getenv("DB_USER", "homework"),
-    "password": os.getenv("DB_PASSWORD", ""),
+    "password": os.getenv("DB_PASSWORD", "homework80"),
     "db":       os.getenv("DB_NAME", "sknmainproject1_db"),
     "charset":  "utf8mb4",
 }
 
-TREND_COLOR = {"UP": "#2ecc71", "DOWN": "#e74c3c", "FLAT": "#95a5a6"}
+CHART_COLORWAY = ["#2477bd", "#5aa9df", "#174f84", "#8fc7ec", "#315a7c", "#6f9dc5"]
+px.defaults.color_discrete_sequence = CHART_COLORWAY
+TREND_COLOR = {"UP": "#16a34a", "DOWN": "#dc2626", "FLAT": "#52677a"}
 
 
 # ============================================================
@@ -321,11 +323,11 @@ def fmt_trend(val, threshold: float = 0.5) -> str:
 def color_trend_str(val) -> str:
     if isinstance(val, str):
         if val.startswith("▲"):
-            return "color: #2ecc71; font-weight: 600"
+            return "color: #16a34a; font-weight: 600"
         elif val.startswith("▼"):
-            return "color: #e74c3c; font-weight: 600"
+            return "color: #dc2626; font-weight: 600"
         elif val.startswith("━"):
-            return "color: #95a5a6; font-weight: 600"
+            return "color: #52677a; font-weight: 600"
     return ""
 
 
@@ -347,7 +349,7 @@ def _ym_fmt(ym_str: str) -> str:
 # 렌더링
 # ============================================================
 def show():
-    st.title("🚗 전국 자동차 등록 현황 트렌드 대시보드")
+    st.title("전국 자동차 등록 현황 트렌드 대시보드")
     st.caption("데이터: 국토교통부 자동차 등록 현황")
 
     summary = get_summary()
@@ -405,7 +407,7 @@ def show():
         c4.metric("급감 연료", "-")
     st.divider()
 
-    tab_m, tab_y = st.tabs(["📅 월별 트렌드", "📊 연도별 트렌드"])
+    tab_m, tab_y = st.tabs(["월별 트렌드", "연도별 트렌드"])
 
     def show_table(df: pd.DataFrame, rename: dict = None, trend_col: str = "방향"):
         d = df.rename(columns=rename) if rename else df.copy()
@@ -435,7 +437,7 @@ def show():
             top3_kws = st.session_state.get("trend_keywords", [])
             if top3_kws:
                 kw_tags = "  |  ".join(f"**{k}**" for k in top3_kws)
-                st.caption(f"📌 FAQ 트렌드 키워드 자동 전달 중 → {kw_tags}  (첫 번째 키워드 기본 선택)")
+                st.caption(f"FAQ 트렌드 키워드 자동 전달 중: {kw_tags}  (첫 번째 키워드 기본 선택)")
         st.divider()
 
         st.subheader("승용 차종별 트렌드")
@@ -509,7 +511,14 @@ def show():
                 annotation_text="평균",
                 annotation_position="bottom right",
             )
-            fig_y5.update_layout(margin=dict(t=20, b=20), xaxis=dict(tickangle=-45))
+            fig_y5.update_layout(
+                margin=dict(t=20, b=20),
+                paper_bgcolor="#ffffff",
+                plot_bgcolor="#ffffff",
+                font=dict(color="#17324d"),
+                xaxis=dict(tickangle=-45, gridcolor="#e8f4fb", linecolor="#cfe4f7"),
+                yaxis=dict(gridcolor="#e8f4fb", linecolor="#cfe4f7"),
+            )
             st.plotly_chart(fig_y5, use_container_width=True)
 
             df_y5_tbl = fmt_ym(df_y5)[["year_months", "import_cnt", "total_cnt", "import_pct"]].copy()

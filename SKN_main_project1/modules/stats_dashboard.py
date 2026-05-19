@@ -44,6 +44,12 @@ COLUMN_LABELS = {
 }
 
 
+CHART_COLORWAY = [
+    "#2477bd", "#5aa9df", "#174f84", "#8fc7ec",
+    "#315a7c", "#6f9dc5", "#0f2f55", "#b8dcf2",
+]
+px.defaults.color_discrete_sequence = CHART_COLORWAY
+
 def make_unique_columns(columns):
     counts = {}
     unique = []
@@ -76,10 +82,18 @@ def style_chart(fig):
         title_font=dict(color="#0f2f55", size=17),
         legend_title_text="",
         margin=dict(l=20, r=20, t=60, b=20),
+        colorway=CHART_COLORWAY,
+        hoverlabel=dict(bgcolor="#ffffff", font_color="#17324d", bordercolor="#cfe4f7"),
         yaxis=dict(tickformat=',d'),
     )
-    fig.update_xaxes(showgrid=True, gridcolor="#edf5fc", linecolor="#cfe4f7", type="category")
-    fig.update_yaxes(showgrid=True, gridcolor="#edf5fc", linecolor="#cfe4f7")
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="#e8f4fb",
+        linecolor="#cfe4f7",
+        zerolinecolor="#cfe4f7",
+        type="category",
+    )
+    fig.update_yaxes(showgrid=True, gridcolor="#e8f4fb", linecolor="#cfe4f7", zerolinecolor="#cfe4f7")
     return fig
 
 
@@ -117,7 +131,7 @@ def _get_latest_ym() -> str:
 
 
 def model_1_age_stats():
-    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>1. 연식 차량 대수 조회</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>연식 차량 대수 조회</h2>", unsafe_allow_html=True)
     st.markdown("---")
 
     latest_ym = _get_latest_ym()
@@ -241,7 +255,7 @@ def model_1_age_stats():
 
 
 def model_2_region_analysis():
-    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>2. 연료/배기량별 차량등록 수</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>연료/배기량별 차량등록 수</h2>", unsafe_allow_html=True)
 
     col_control1, col_control2 = st.columns(2)
     with col_control1:
@@ -395,7 +409,7 @@ def model_2_region_analysis():
 
 
 def model_3_gender_age_stats():
-    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>3. 성별·연령별 차량 등록 추이</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>성별·연령별 차량 등록 추이</h2>", unsafe_allow_html=True)
     df = load_data("SELECT * FROM car_gender_age_stats")
     if df.empty:
         return
@@ -483,7 +497,7 @@ def model_4_yearly_stats():
 
     st.markdown(
         "<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>"
-        "4. 연간 자동차 등록 추이"
+        "연간 자동차 등록 추이"
         "</h2>",
         unsafe_allow_html=True,
     )
@@ -549,7 +563,7 @@ def model_4_yearly_stats():
 
 
 def model_5_region_ranking():
-    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>5. 지역별 등록 증감 순위</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='font-size: 1.65rem; color: #0f2f55; margin-bottom: 0.8rem;'>지역별 등록 증감 순위</h2>", unsafe_allow_html=True)
     df = load_data("SELECT * FROM car_region_stats")
     if df.empty:
         return
@@ -641,14 +655,19 @@ def model_5_region_ranking():
 # 디스패처
 # ============================================================
 MODELS = [
-    "1. 연식 차량 대수 조회",
-    "2. 연료/배기량별 차량등록 수",
-    "3. 성별·연령별 등록 추이",
-    "4. 연간 자동차 등록 추이",
-    "5. 지역별 등록 증감 순위",
+    "연식 차량 대수 조회",
+    "연료/배기량별 차량등록 수",
+    "성별·연령별 등록 추이",
+    "연간 자동차 등록 추이",
+    "지역별 등록 증감 순위",
 ]
 
 _MODEL_FN = {
+    "연식 차량 대수 조회":      model_1_age_stats,
+    "연료/배기량별 차량등록 수": model_2_region_analysis,
+    "성별·연령별 등록 추이":     model_3_gender_age_stats,
+    "연간 자동차 등록 추이":     model_4_yearly_stats,
+    "지역별 등록 증감 순위":     model_5_region_ranking,
     "1. 연식 차량 대수 조회":      model_1_age_stats,
     "2. 연료/배기량별 차량등록 수": model_2_region_analysis,
     "3. 성별·연령별 등록 추이":     model_3_gender_age_stats,
@@ -658,7 +677,7 @@ _MODEL_FN = {
 
 
 def render(model_choice: str):
-    st.title("📊 자동차 등록 통계 대시보드")
+    st.title("자동차 등록 통계 대시보드")
     st.markdown(
         '<p style="color:#315a7c; font-size:1.02rem; margin-top:-0.35rem; margin-bottom:1.25rem;">'
         '자동차 등록 데이터를 조건별로 조회하고 그래프와 표로 비교합니다.'

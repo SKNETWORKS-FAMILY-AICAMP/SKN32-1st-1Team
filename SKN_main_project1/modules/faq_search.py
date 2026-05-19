@@ -14,9 +14,9 @@ DB_CONFIG = {
     "host":     os.getenv("DB_HOST",     "localhost"),
     "port":     int(os.getenv("DB_PORT", "3306")),
     "user":     os.getenv("DB_USER",     "homework"),
-    "password": os.getenv("DB_PASSWORD", "playdatahomework80"),
+    "password": os.getenv("DB_PASSWORD", "homework80"),
     "charset":  "utf8mb4",
-    "db":       os.getenv("DB_NAME",     "car_project_db"),
+    "db":       os.getenv("DB_NAME",     "sknmainproject1_db"),
 }
 
 BRAND_COLORS = {
@@ -103,7 +103,7 @@ def _render_pagination(total: int, current_page: int, prefix: str = "top") -> in
     cols = st.columns([1.2] + [0.8] * len(page_nums) + [1.2])
 
     with cols[0]:
-        if st.button("◀ 이전", key=f"_pg_{prefix}_prev", disabled=(current_page == 1), use_container_width=True):
+        if st.button("이전", key=f"_pg_{prefix}_prev", disabled=(current_page == 1), use_container_width=True):
             next_page = current_page - 1
 
     for i, pn in enumerate(page_nums):
@@ -113,35 +113,10 @@ def _render_pagination(total: int, current_page: int, prefix: str = "top") -> in
                 next_page = pn
 
     with cols[-1]:
-        if st.button("다음 ▶", key=f"_pg_{prefix}_next", disabled=(current_page == total_pages), use_container_width=True):
+        if st.button("다음", key=f"_pg_{prefix}_next", disabled=(current_page == total_pages), use_container_width=True):
             next_page = current_page + 1
 
     return next_page
-
-
-# ──────────────────────────────────────────────
-# 콜백
-# ──────────────────────────────────────────────
-def _on_search_change(trend_keywords: list[str]):
-    if st.session_state.faq_search_input:
-        for kw in trend_keywords:
-            st.session_state[f"kw_{kw}"] = False
-
-
-def _on_keyword_change(kw: str):
-    if st.session_state[f"kw_{kw}"]:
-        st.session_state.faq_search_input = ""
-
-
-def _on_brand_all_change(all_brands: list[str]):
-    val = st.session_state.brand_all_check
-    for b in all_brands:
-        st.session_state[f"brand_{b}"] = val
-
-
-def _on_brand_change(all_brands: list[str]):
-    all_checked = all(st.session_state.get(f"brand_{b}", True) for b in all_brands)
-    st.session_state.brand_all_check = all_checked
 
 
 # ──────────────────────────────────────────────
@@ -153,26 +128,18 @@ def show():
     if "faq_search_input" not in st.session_state:
         st.session_state.faq_search_input = ""
 
-    # 키워드 목록이 바뀌었을 때만 체크 상태 강제 재설정 (첫 번째만 True)
+    # 키워드 목록이 바뀌었을 때만 pills 선택 상태를 재설정합니다.
     _cur_kw_list = list(trend_keywords)
     if st.session_state.get("_faq_last_keywords") != _cur_kw_list:
         st.session_state["_faq_last_keywords"] = _cur_kw_list
-        for i, kw in enumerate(trend_keywords):
-            st.session_state[f"kw_{kw}"] = (i == 0)
-    else:
-        for i, kw in enumerate(trend_keywords):
-            if f"kw_{kw}" not in st.session_state:
-                st.session_state[f"kw_{kw}"] = (i == 0)
+        st.session_state["faq_keyword_pills"] = trend_keywords[:1]
 
     all_brands = get_brands()
+    if st.session_state.get("_faq_last_brands") != all_brands:
+        st.session_state["_faq_last_brands"] = all_brands
+        st.session_state["faq_brand_pills"] = list(all_brands)
 
-    if "brand_all_check" not in st.session_state:
-        st.session_state.brand_all_check = True
-    for b in all_brands:
-        if f"brand_{b}" not in st.session_state:
-            st.session_state[f"brand_{b}"] = True
-
-    st.title("🔍 FAQ 검색")
+    st.title("FAQ 검색")
 
     # ── 1. 검색창 ─────────────────────────────
     st.markdown("#### 직접 검색")
@@ -181,31 +148,29 @@ def show():
         st.text_input(
             "검색창",
             key="faq_search_input",
-            placeholder="검색어를 입력하고 검색 버튼을 누르세요...",
+            placeholder="",
             label_visibility="collapsed",
         )
     with col_btn:
         search_clicked = st.button("검색", use_container_width=True)
 
     if search_clicked and st.session_state.faq_search_input:
-        _on_search_change(trend_keywords)
+        st.session_state["faq_keyword_pills"] = []
 
     st.caption("검색어 입력 시 트렌드 키워드 선택은 초기화됩니다.")
     st.divider()
 
     # ── 2. 트렌드 키워드 ──────────────────────
     st.markdown("#### 트렌드 키워드")
-    st.caption("복수 선택 시 모든 키워드가 포함된 FAQ만 표시 · 키워드 선택 시 검색어는 초기화됩니다.")
+    st.caption("복수 선택 시 모든 키워드가 포함된 FAQ만 표시됩니다.")
 
-    kw_cols = st.columns(4)
-    for i, kw in enumerate(trend_keywords):
-        with kw_cols[i % 4]:
-            st.checkbox(
-                kw,
-                key=f"kw_{kw}",
-                on_change=_on_keyword_change,
-                args=(kw,),
-            )
+    sel_keywords = st.pills(
+        "트렌드 키워드 선택",
+        trend_keywords,
+        selection_mode="multi",
+        key="faq_keyword_pills",
+        label_visibility="collapsed",
+    ) or []
 
     st.divider()
 
@@ -214,34 +179,25 @@ def show():
 
     if not all_brands:
         st.warning(
-            "⚠️ 브랜드 데이터가 없습니다.  \n"
-            "`crawler/Crawlermain.py`를 실행하여 크롤링을 먼저 진행해주세요."
+            "브랜드 데이터가 없습니다.  \n"
+            "`crawler/main.py`를 실행하여 크롤링을 먼저 진행해주세요."
         )
         return
 
-    brand_cols = st.columns(len(all_brands) + 1)
-    with brand_cols[0]:
-        st.checkbox(
-            "전체",
-            key="brand_all_check",
-            on_change=_on_brand_all_change,
-            args=(all_brands,),
-        )
-    for i, brand in enumerate(all_brands):
-        with brand_cols[i + 1]:
-            st.checkbox(
-                brand,
-                key=f"brand_{brand}",
-                on_change=_on_brand_change,
-                args=(all_brands,),
-            )
+    sel_brands = st.pills(
+        "브랜드 선택",
+        all_brands,
+        selection_mode="multi",
+        key="faq_brand_pills",
+        label_visibility="collapsed",
+    ) or []
 
     st.divider()
 
     # ── 4. 검색 실행 ──────────────────────────
     search_text  = st.session_state.faq_search_input.strip()
-    sel_keywords = tuple(kw for kw in trend_keywords if st.session_state.get(f"kw_{kw}"))
-    sel_brands   = tuple(b  for b  in all_brands     if st.session_state.get(f"brand_{b}"))
+    sel_keywords = tuple(sel_keywords)
+    sel_brands   = tuple(sel_brands)
 
     if not sel_brands:
         st.info("브랜드를 최소 1개 이상 선택해주세요.")
@@ -258,8 +214,8 @@ def show():
     # ── 5. 결과 출력 ──────────────────────────
     if status == "no_table":
         st.error(
-            "❌ `company_faq` 테이블이 존재하지 않습니다.  \n"
-            "`crawler/Crawlermain.py`를 실행하여 크롤링을 먼저 진행해주세요."
+            "`company_faq` 테이블이 존재하지 않습니다.  \n"
+            "`crawler/main.py`를 실행하여 크롤링을 먼저 진행해주세요."
         )
         return
 
