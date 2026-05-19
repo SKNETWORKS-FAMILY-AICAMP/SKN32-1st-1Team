@@ -1,275 +1,289 @@
-# SKN32-1st-1Team
-# 🚗 자동차 등록 트렌드 × 기업 FAQ 조회 시스템
+# 전국 자동차 등록 현황 및 기업 FAQ 조회 시스템
 
-안녕하세요!  
-이 프로젝트는 단순히 “FAQ를 검색하는 소비자 편의 기능”에서 끝나지 않습니다.  
-전국 자동차 등록 현황과 자동차 기업 FAQ 데이터를 함께 보면서,  
-**등록 트렌드 변화에 따라 어떤 기업군에서 어떤 고객 문의 이슈가 나타나는지 모니터링하는 데이터 조회 시스템**을 목표로 합니다. ✨
+> 국토교통부 자동차 등록 데이터를 시계열로 분석하고,  
+> 트렌드와 연동된 기업 FAQ를 함께 조회할 수 있는 통합 대시보드
+
+**Team** : 소나기 1팀 | SKN Family AI Camp 32기 1차 프로젝트
+| 역할 | 이름 |
+| --- |   --- |
+| 팀장 | 오한빈 |
+| 팀원 | 김택현 |
+| 팀원 | 신지은 |
+| 팀원 | 최상욱 |
+| 팀원 | 하정원 |
+---
+
+## 목차
+
+1. [프로젝트 소개](#1-프로젝트-소개)
+2. [주제 선정 이유](#2-주제-선정-이유)
+3. [주요 기능](#3-주요-기능)
+4. [시스템 구조](#4-시스템-구조)
+5. [기술 스택](#5-기술-스택)
+6. [데이터 소스](#6-데이터-소스)
+7. [설치 및 실행](#7-설치-및-실행)
+8. [DB 구조](#8-db-구조)
+9. [크롤러 관리](#9-크롤러-관리)
+10. [팀 정보](#10-팀-정보)
 
 ---
 
-## 🎯 프로젝트 핵심 방향
+## 1. 프로젝트 소개
 
-> “FAQ 조회시스템”을 소비자 편의 기능으로만 두지 말고,  
-> 자동차 등록 트렌드에 따라 관련 기업군의 고객 문의 이슈를 모니터링하는 자료로 만든다.
+국토교통부가 매월 공개하는 **전국 자동차 등록 현황** 데이터를 DB에 적재하고,  
+연료·차종·지역·연령 등 다양한 기준으로 트렌드를 분석합니다.  
+분석된 트렌드 키워드는 **기업 FAQ 검색과 자동 연동**되어,  
+"어떤 차가 뜨고 있는지"와 "고객이 무엇을 궁금해하는지"를 한 화면에서 확인할 수 있습니다.
+사용자는 전국 자동차 등록 현황의 세부 항목 통계들을 쉽게 표와 시각차트로 조회할 수 있습니다. 
+---
 
-즉, 이 프로젝트는 아래 두 데이터를 연결해서 봅니다.
+## 2. 주제 선정 이유
 
-1. **전국 자동차 등록 현황**
-   - 연도별 / 월별 등록 추이
-   - 지역별 등록 현황
-   - 차종, 연료, 용도 등 자동차 시장 변화
+### 데이터 관점
 
-2. **자동차 기업 FAQ 데이터**
-   - 브랜드별 고객 문의 주제
-   - 전기차, 충전, 서비스, 정비, 앱, 보증, 구매, 등록 관련 이슈
-   - 기업별 고객 대응 관심사 비교
+| 데이터 | 특성 | 활용 목적 |
+|---|---|---|
+| 전국 자동차 등록 현황 | 년·월별 정량 수치 (차종·연료·지역·연령 등) | 시간 흐름에 따른 트렌드 및 증감 파악 |
+| 기업 FAQ | 고객이 가장 많이 묻는 Q&A 텍스트 | 트렌드 차종에 대한 실제 고객 관심사 확인 |
+
+두 데이터를 결합하면 **"통계로 확인된 트렌드"** 와 **"현장 고객의 목소리"** 를 동시에 파악할 수 있습니다.
+
+### 프로젝트 전략
+
+- 크롤링 성능보다 **데이터 신뢰도·정확성** 에 집중
+- 등록 현황 데이터를 충분히 분석한 뒤, 트렌드에 맞는 기업 FAQ를 선별하여 연동
+- 코드 기능(DB Select)으로 트렌드를 산출하고, `company_config` 테이블의 `is_active` 컬럼으로 기업별 크롤링을 on/off 제어 → 트렌드가 바뀌어도 유지보수 비용 최소화
 
 ---
 
-## 🧭 왜 FAQ 데이터를 모으는가?
+## 3. 주요 기능
 
-FAQ는 단순한 “자주 묻는 질문” 목록이 아닙니다.  
-기업 입장에서는 고객들이 반복적으로 궁금해하는 지점이 모인 **고객 이슈 데이터**입니다.
+### 트렌드 대시보드
+- 연료별 단기 트렌드 (최근 6개월 vs 이전 6개월 평균 비교)
+- 승용 차종별 트렌드
+- 배기량 구간별 트렌드
+- 성별·연령대별 등록 트렌드
+- 수입차 비중 월별 추이 (라인 차트 + 전월 대비)
+- 연도별 시장 규모·성장률·차종별 현황·지역별 증감
 
-예를 들어:
+### FAQ 검색
+- 트렌드 대시보드의 **급증 연료 Top 3** 가 FAQ 키워드로 자동 전달
+- 브랜드 필터 (전체 선택/개별 선택)
+- 직접 검색어 입력
+- 페이지네이션 (10건씩, 5페이지 단위 그룹)
 
-- 전기차 등록이 늘어나면  
-  → 충전, 배터리, 주행 가능 거리, 보조금 관련 FAQ가 중요해질 수 있습니다.
-
-- 수입차 등록이 증가하면  
-  → 보증, 서비스센터, 부품, 커넥티드 서비스 관련 문의가 중요해질 수 있습니다.
-
-- 특정 지역에서 특정 차종 등록이 늘어나면  
-  → 해당 지역의 서비스 수요나 정비 문의 증가를 예측하는 데 참고할 수 있습니다.
-
-그래서 FAQ 데이터는 소비자 검색용을 넘어서,  
-**기업 고객 대응 전략과 시장 트렌드 분석에 활용 가능한 자료**가 됩니다. 🔍
+### 통계 분석
+- 연식별 차량 대수 조회
+- 연료/배기량별 차량 등록 수 추이
+- 성별·연령별 등록 추이
+- 연간 자동차 등록 추이
+- 지역별 등록 증감 순위
 
 ---
 
-## 🏢 수집 대상 기업
+## 4. 시스템 구조
 
-현재 또는 향후 수집 가능한 자동차 브랜드는 아래와 같습니다.
+```
+SKN32-1st-1Team/
+├── modules/
+│   ├── connect_db.py           # DB 연결 공통 유틸
+│   ├── trend_dashboard.py      # 트렌드 대시보드 페이지
+│   ├── faq_search.py           # FAQ 검색 페이지
+│   └── stats_dashboard.py      # 통계 분석 페이지
+│
+├── crawler/
+│   ├── hyundai_faq_crawler.py
+│   ├── kia_faq_crawler.py
+│   ├── bmw_faq_crawler.py
+│   ├── genesis_faq_crawler.py
+│   ├── cadillac_faq_crawler.py
+│   ├── chevrolet_faq_crawler.py
+│   ├── porsche_faq_crawler.py
+│   ├── volkswagen_faq_crawler.py
+│   └── main.py                 # 전체 크롤러 통합 실행
+│
+├── data/
+|   ├──auto_data/               # 국토교통부 엑셀 통계 데이터 저장폴더
+│   ├── data_downloader.py      # 국토교통부 엑셀 자동 다운로드
+│   └── load_to_db.py           # 엑셀 → DB 적재
+│
+├── sql/
+│   ├── ddl/
+│   │   └── car_registration_db.sql     # 테이블 스키마 정의
+│   └── query/
+│       └── trend_analysis_queries.sql  # 트렌드 분석 쿼리 모음
+│
+├── app.py                      # Streamlit 통합 진입점
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
 
-| 구분 | 브랜드 |
+---
+
+## 5. 기술 스택
+
+| 분류 | 기술 |
 |---|---|
-| 국내 완성차 | 현대, 기아, 쉐보레 |
-| 수입차 | BMW, Cadillac |
-| 추가 가능 | Porsche, Mercedes-Benz, MINI, Lexus 등 |
-
-브랜드는 계속 추가될 수 있습니다.  
-중요한 것은 모든 브랜드 데이터를 비슷한 구조로 저장해서, 나중에 통합 조회가 가능하게 만드는 것입니다.
+| 언어 | Python 3.x |
+| 대시보드 | Streamlit 1.57.0 |
+| 데이터 처리 | Pandas 2.2, Plotly 5.24 |
+| DB | MySQL 8.0 |
+| DB 연결 | PyMySQL 1.1, SQLAlchemy 2.0, mysql-connector-python 9.7 |
+| 크롤링 | Selenium 4.27, Playwright 1.59, BeautifulSoup4 4.12 |
+| 드라이버 관리 | webdriver-manager 4.0 |
+| 엑셀 파싱 | openpyxl 3.1 |
+| 환경변수 | python-dotenv 1.2 |
 
 ---
 
-## 🗄️ FAQ DB 공통 구조
+## 6. 데이터 소스
 
-브랜드별 DB나 테이블 이름은 다를 수 있지만, FAQ 데이터는 아래 구조를 기준으로 맞추는 것을 권장합니다.
+### 전국 자동차 등록 현황
+- **출처** : 국토교통부 공공데이터포털 (월별 엑셀 파일)
+- **링크** : https://stat.molit.go.kr/portal/cate/statMetaView.do?hRsId=58
+- **갱신 주기** : 매월
+- **주요 항목** : 차종·연료·지역·용도·성별·연령대·배기량·국산/수입 구분
 
-```text
-faq
-├── id
-├── brand
-├── category
-├── question
-├── raw_question
-├── answer
-├── source_url
-└── crawled_at
+### 기업 FAQ
+- **출처** : 각 브랜드 공식 홈페이지 FAQ 페이지
+- **갱신 주기** : 1개월 ~ 6개월
+- **수집 대상** : 현대·기아·제네시스·BMW·포르쉐·캐딜락·쉐보레·폭스바겐
+- 기아 FAQ - https://www.kia.com/kr/customer-service/center/faq
+- bmw FAQ - https://www.bmw.co.kr/kr/s/?language=ko
+- 포르쉐 FAQ - https://www.porsche.com/korea/ko/faq/
+- 폭스바겐 FAQ - https://www.volkswagen.co.kr/ko/faq.html
+- 쉐보레 FAQ - https://www.chevrolet.co.kr/faq
+- 현대자동차 FAQ - https://www.hyundai.com/kr/ko/faq.html
+- 제네시스 FAQ - https://www.genesis.com/kr/ko/support/faq.html
+- 케딜락 FAQ - https://www.cadillac.co.kr/onstar/onstar-faq
+---
+
+## 7. 설치 및 실행
+
+### 가상환경 vscode cmd 터미널 설치
+- python -m venv .venv (설치) → .venv\Scripts\activate (실행)
+
+
+### 사전 요구사항
+- Python 3.10 이상
+- MySQL 8.0 이상
+- Google Chrome (Selenium 크롤러용)
+
+### 설치
+
+```bash
+# 1. 저장소 클론
+git clone https://github.com/SKN32-1st-1Team/프로젝트명.git
+cd SKN32-1st-1Team
+
+# 2. 패키지 설치
+pip install -r requirements.txt
+
+# 3. Playwright 브라우저 설치 (기아·폭스바겐 크롤러용)
+playwright install chromium
 ```
 
-### 컬럼 설명
+### 환경변수 설정
 
-| 컬럼 | 설명 |
+`.env` 파일을 프로젝트 루트에 생성합니다.
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=your_user
+DB_PASSWORD=your_password
+DB_NAME=sknmainproject1_db
+```
+### 실행 순서
+
+- sql/ddl/car_registration_db.sql - DB 구축
+- car_registration_downloader.py - 전국 자동차 등록현황 엑셀 데이터파일 다운로드
+- load_to_db.py - DB에 데이터 적재
+- crawler/main.py - 크롤링 후 DB 에 데이터 적재
+- streamlit run app.py - 대시보드 실행 (명령 프롬프트에 입력)
+
+### DB 초기화
+
+```bash
+mysql -u root -p < sql/ddl/car_registration_db.sql
+```
+
+### 데이터 적재
+
+```bash
+# 엑셀 파일을 data/ 폴더에 준비한 뒤 실행
+python data/load_to_db.py
+```
+
+### FAQ 크롤링 (선택)
+
+```bash
+cd crawler
+python main.py
+```
+
+### 대시보드 실행
+
+```bash
+streamlit run app.py
+```
+
+브라우저에서 `http://localhost:8501` 접속
+
+---
+
+## 8. DB 구조
+
+주요 테이블 목록:
+
+| 테이블 | 설명 |
 |---|---|
-| `id` | FAQ 고유 번호 |
-| `brand` | 브랜드명. 예: BMW, Porsche, Hyundai |
-| `category` | FAQ 카테고리. 예: 충전, 서비스, 구매, 앱 |
-| `question` | 정제된 질문 |
-| `raw_question` | 원본 질문 |
-| `answer` | 답변 본문 |
-| `source_url` | 크롤링 출처 URL |
-| `crawled_at` | 수집 시각 |
+| `car_fuel_stats` | 연료별 월간 등록 현황 |
+| `car_type_detail_stats` | 차종별 세부 월간 등록 현황 |
+| `car_displacement_stats` | 배기량별 월간 등록 현황 |
+| `car_gender_age_stats` | 성별·연령대별 월간 등록 현황 |
+| `car_region_stats` | 지역별 월간 등록 현황 |
+| `car_yearly_stats` | 차종별 연간 등록 현황 |
+| `car_new_registration` | 신조차·수입차·부활차 월간 현황 |
+| `car_age_stats` | 연식별 등록 현황 |
+| `load_history` | 데이터 적재 이력 |
+| `company_config` | 크롤링 대상 기업 설정 |
+| `company_faq` | 수집된 기업 FAQ 데이터 |
 
-현재 일부 팀원 DB에는 `brand` 컬럼이 없을 수 있습니다.  
-그 경우 조회 시스템에서 테이블명 또는 DB명으로 브랜드를 구분하거나, 통합 테이블을 만들 때 `brand` 컬럼을 추가하면 됩니다.
-
----
-
-## 🧩 브랜드별 FAQ 활용 예시
-
-### BMW
-
-- FAQ 수가 많고 주제가 다양합니다.
-- 앱, 커넥티드 서비스, 충전, 디지털 키, 서비스 이력 등 디지털/서비스형 문의가 많습니다.
-- 수입차 고객지원 이슈를 보기 좋습니다.
-
-### Porsche
-
-- 질문 앞 `[충전]`, `[개인정보보호]`, `[계약]`처럼 카테고리가 명확합니다.
-- 전기차 충전, 커넥트 서비스, 인증 중고차, 긴급출동 등 기업 대응 이슈가 잘 드러납니다.
-
-### 현대 / 기아 / 쉐보레 / 캐딜락
-
-- 국내외 브랜드 비교용으로 활용할 수 있습니다.
-- 구매, 정비, 보증, 부품, 서비스센터, 전기차 관련 문의 흐름을 비교하기 좋습니다.
+ERD 시각화: 프로젝트 루트의 `erd.html` 파일을 브라우저에서 열어 확인
 
 ---
 
-## 📊 자동차 등록 현황과 FAQ를 연결하는 방법
+## 9. 크롤러 관리
 
-이 프로젝트의 재미는 여기서 시작됩니다. 🌈
+트렌드가 변화하더라도 코드 수정 없이 DB에서 크롤링 대상을 제어할 수 있습니다.
 
-FAQ만 보면 “고객 질문 목록”이지만,  
-등록 현황과 함께 보면 “시장 변화에 따른 고객 이슈”가 됩니다.
-
-예시 분석 방향:
-
-```text
-전기차 등록 증가
-→ 충전 / 배터리 / 주행 가능 거리 FAQ 증가 여부 확인
-
-수입차 등록 증가
-→ 서비스센터 / 보증 / 부품 / 커넥티드 서비스 FAQ 비교
-
-지역별 등록 차이
-→ 지역 기반 서비스 수요나 고객지원 이슈 해석
-
-월별 신규 등록 변화
-→ 구매 / 계약 / 인도 / 보조금 문의 주제와 연결
-```
-
----
-
-## 🔎 추천 조회 쿼리
-
-### 브랜드별 FAQ 건수
+### 특정 기업 비활성화
 
 ```sql
-SELECT brand, COUNT(*) AS faq_count
-FROM faq
-GROUP BY brand
-ORDER BY faq_count DESC;
+UPDATE company_config SET is_active = 0 WHERE company_name = '폭스바겐';
 ```
 
-### 브랜드별 카테고리 분포
+### 새 기업 추가
 
 ```sql
-SELECT brand, category, COUNT(*) AS cnt
-FROM faq
-GROUP BY brand, category
-ORDER BY brand, cnt DESC;
+INSERT INTO company_config (company_name, company_url, brand_type, keywords, is_active)
+VALUES ('토요타', 'https://toyota.co.kr/...', '수입', '["하이브리드","SUV"]', 1);
 ```
 
-### 전기차/충전 관련 FAQ 검색
-
-```sql
-SELECT brand, category, question, answer
-FROM faq
-WHERE question LIKE '%충전%'
-   OR answer LIKE '%충전%'
-   OR question LIKE '%배터리%'
-   OR answer LIKE '%배터리%';
-```
-
-### 서비스/정비 관련 FAQ 검색
-
-```sql
-SELECT brand, category, question, answer
-FROM faq
-WHERE question LIKE '%서비스%'
-   OR answer LIKE '%서비스%'
-   OR question LIKE '%정비%'
-   OR answer LIKE '%정비%'
-   OR question LIKE '%보증%'
-   OR answer LIKE '%보증%';
-```
+새 기업 크롤러 파일(`crawler/toyota_faq_crawler.py`)을 작성하고 `crawler/main.py`에 등록하면 됩니다.
 
 ---
 
-## 🖥️ Streamlit 조회 시스템 방향
+## 10. 팀 정보
 
-Streamlit 화면은 크게 두 영역으로 나눌 수 있습니다.
+**소나기 1팀** | SKN Family AI Camp 32기 1차 프로젝트
 
-### 1. 전국 자동차 등록 현황
-
-- 연도별 등록 추이
-- 월별 등록 추이
-- 지역별 등록 현황
-- 연료별 / 차종별 / 용도별 등록 현황
-
-### 2. 기업 FAQ 조회
-
-- 브랜드별 FAQ 검색
-- 카테고리별 FAQ 필터
-- 전기차/충전/서비스/구매 등 이슈 키워드 검색
-- 브랜드별 FAQ 주제 비교
-
-핵심은 두 데이터를 따로 보여주는 것이 아니라,  
-**등록 트렌드 변화와 FAQ 이슈를 함께 해석할 수 있게 만드는 것**입니다.
-
----
-
-## 📁 현재 별도 정리된 크롤링 폴더 예시
-
-```text
-bmw_faq_project/
-├── bmw_faq_crawler.py
-├── bmw_faq_schema.sql
-└── README.md
-
-porsche_faq_project/
-├── porsche_faq_crawler.py
-├── porsche_faq_schema.sql
-└── README.md
-```
-
-다른 브랜드도 같은 방식으로 정리하면 좋습니다.
-
-```text
-brand_faq_project/
-├── brand_faq_crawler.py
-├── brand_faq_schema.sql
-└── README.md
-```
-
----
-
-## ✅ 데이터 품질 체크 포인트
-
-크롤링 후에는 아래 항목을 꼭 확인합니다.
-
-- 질문이 누락되지 않았는가?
-- 답변이 미리보기 문장만 저장되지 않았는가?
-- 빈 답변이 있는가?
-- 카테고리가 제대로 들어갔는가?
-- 출처 URL이 저장되었는가?
-- 중복 질문이 있는가?
-
-예시 쿼리:
-
-```sql
-SELECT COUNT(*) AS total_count
-FROM faq;
-
-SELECT COUNT(*) AS empty_answer_count
-FROM faq
-WHERE answer IS NULL
-   OR TRIM(answer) = '';
-
-SELECT category, COUNT(*) AS cnt
-FROM faq
-GROUP BY category
-ORDER BY cnt DESC;
-```
-
----
-
-## 💬 한 줄 요약
-
-이 프로젝트는 자동차 FAQ를 그냥 모아두는 것이 아니라,  
-**자동차 등록 트렌드와 고객 문의 이슈를 함께 읽는 기업형 데이터 조회 시스템**입니다. 🚙📈
-
-고객이 무엇을 궁금해하는지, 시장이 어디로 움직이는지,  
-그 둘을 같이 보는 것이 이 프로젝트의 핵심입니다. ✨
+| 역할 | 이름 |
+| --- |   --- |
+| 팀장 | 오한빈 |
+| 팀원 | 김택현 |
+| 팀원 | 신지은 |
+| 팀원 | 최상욱 |
+| 팀원 | 하정원 |
