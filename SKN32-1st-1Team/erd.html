@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>소나기 팀 | DB ERD</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #f4f8fc;
+      font-family: 'Segoe UI', sans-serif;
+      color: #17324d;
+    }
+    header {
+      background: #0f2f55;
+      color: #fff;
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    header span {
+      color: #7ecef4;
+      font-size: 0.95rem;
+      margin-left: 1rem;
+      font-weight: 400;
+    }
+    .container {
+      padding: 2rem;
+    }
+    .legend {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.88rem;
+    }
+    .legend-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+    }
+    .mermaid {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 18px rgba(15,47,85,0.09);
+      padding: 2rem;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    소나기 팀 | DB ERD — sknmainproject1_db
+    <span>SKN Family AI Camp 32기 1차 프로젝트</span>
+  </header>
+
+  <div class="container">
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#2477bd"></div> 월별 통계 테이블 (year_months 기준)
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#27ae60"></div> 연간 통계 테이블
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#e67e22"></div> FAQ 관련 테이블
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#8e44ad"></div> 시스템 테이블
+      </div>
+    </div>
+
+    <div class="mermaid">
+erDiagram
+
+  load_history {
+    INT id PK
+    CHAR6 year_months UK
+    VARCHAR200 filename
+    TIMESTAMP loaded_at
+    INT row_count
+  }
+
+  car_yearly_stats {
+    INT id PK
+    YEAR stat_year
+    ENUM car_type
+    ENUM usage_type
+    BIGINT registered_count
+    TIMESTAMP created_at
+  }
+
+  car_region_stats {
+    INT id PK
+    CHAR6 year_months FK
+    VARCHAR20 region
+    ENUM car_type
+    INT cnt_official
+    INT cnt_private
+    INT cnt_business
+    INT cnt_total
+    TIMESTAMP created_at
+  }
+
+  car_fuel_stats {
+    INT id PK
+    CHAR6 year_months FK
+    VARCHAR20 region
+    ENUM fuel_type
+    ENUM car_type
+    ENUM usage_type
+    INT registered_count
+    TIMESTAMP created_at
+  }
+
+  car_gender_age_stats {
+    INT id PK
+    CHAR6 year_months FK
+    VARCHAR20 region
+    ENUM gender
+    ENUM age_group
+    INT registered_count
+    TIMESTAMP created_at
+  }
+
+  car_type_detail_stats {
+    INT id PK
+    CHAR6 year_months FK
+    VARCHAR20 region
+    ENUM car_type
+    VARCHAR30 car_subtype
+    INT registered_count
+    TIMESTAMP created_at
+  }
+
+  car_displacement_stats {
+    INT id PK
+    CHAR6 year_months FK
+    VARCHAR20 region
+    ENUM displacement
+    INT registered_count
+    TIMESTAMP created_at
+  }
+
+  car_new_registration {
+    INT id PK
+    CHAR6 year_months FK
+    VARCHAR20 region
+    ENUM car_type
+    ENUM reg_type
+    INT registered_count
+    TIMESTAMP created_at
+  }
+
+  car_age_stats {
+    INT id PK
+    CHAR6 year_months FK
+    YEAR model_year
+    ENUM car_type
+    ENUM usage_type
+    INT registered_count
+    TIMESTAMP created_at
+  }
+
+  company_config {
+    INT id PK
+    VARCHAR100 company_name UK
+    VARCHAR500 company_url
+    ENUM brand_type
+    JSON keywords
+    VARCHAR50 related_fuel
+    VARCHAR50 related_car_type
+    TINYINT is_active
+    TINYINT crawl_interval_days
+    TIMESTAMP last_crawled_at
+    TIMESTAMP created_at
+    TIMESTAMP updated_at
+  }
+
+  company_faq {
+    INT id PK
+    VARCHAR50 brand FK
+    VARCHAR100 category
+    TEXT question
+    MEDIUMTEXT answer
+    TIMESTAMP created_at
+  }
+
+  trend_analysis_cache {
+    INT id PK
+    VARCHAR100 analysis_type
+    CHAR6 base_year_month
+    TINYINT period_years
+    JSON result_json
+    VARCHAR100 trend_keyword
+    TIMESTAMP created_at
+    TIMESTAMP expires_at
+  }
+
+  load_history ||--o{ car_region_stats       : "year_months"
+  load_history ||--o{ car_fuel_stats         : "year_months"
+  load_history ||--o{ car_gender_age_stats   : "year_months"
+  load_history ||--o{ car_type_detail_stats  : "year_months"
+  load_history ||--o{ car_displacement_stats : "year_months"
+  load_history ||--o{ car_new_registration   : "year_months"
+  load_history ||--o{ car_age_stats          : "year_months"
+  company_config ||--o{ company_faq          : "company_name / brand"
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default', er: { diagramPadding: 30 } });
+  </script>
+</body>
+</html>
