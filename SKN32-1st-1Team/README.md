@@ -201,6 +201,7 @@ DB_NAME=sknmainproject1_db
 - car_registration_downloader.py - 전국 자동차 등록현황 엑셀 데이터파일 다운로드
 - load_to_db.py - DB에 데이터 적재
 - crawler/main.py - 크롤링 후 DB 에 데이터 적재
+- streamlit run app.py - 대시보드 실행 (명령 프롬프트에 입력)
 
 ### DB 초기화
 
